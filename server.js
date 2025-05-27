@@ -1,49 +1,91 @@
 const express = require('express');
 const cors = require('cors');
 const ytdl = require('ytdl-core');
-const puppeteer = require('puppeteer');
-const TikTokScraper = require('tiktok-scraper');
 const Insta = require('insta-fetcher');
-const path = require('path');
-
+const puppeteer = require('puppeteer');
 const app = express();
+
 app.use(cors());
 app.use(express.static('public'));
-app.use(express.json());
 
-app.post('/download', async (req, res) => {
-    const { url } = req.body;
+const PORT = process.env.PORT || 3000;
 
-    try {
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-            const info = await ytdl.getInfo(url);
-            res.json({ download: ytdl.chooseFormat(info.formats, { quality: 'highest' }).url });
-        } else if (url.includes('tiktok.com')) {
-            const videoMeta = await TikTokScraper.getVideoMeta(url);
-            res.json({ download: videoMeta.videoUrl });
-        } else if (url.includes('instagram.com')) {
-            const media = await Insta.fetchPost(url);
-            res.json({ download: media.media });
-        } else if (url.includes('facebook.com')) {
-            const browser = await puppeteer.launch({ headless: true });
-            const page = await browser.newPage();
-            await page.goto(url);
-            const vidUrl = await page.evaluate(() => {
-                const video = document.querySelector('video');
-                return video ? video.src : null;
-            });
-            await browser.close();
-            res.json({ download: vidUrl });
-        } else if (url.includes('twitter.com')) {
-            // Suggest using an external API or a headless browser
-            res.json({ download: "Use Twitter API or external tool for video" });
-        } else {
-            res.status(400).json({ error: 'Unsupported URL' });
-        }
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to process the link' });
+// === YOUTUBE ===
+app.get('/api/youtube', async (req, res) => {
+  try {
+    const videoURL = req.query.url;
+    if (!ytdl.validateURL(videoURL)) {
+      return res.status(400).json({ error: 'Invalid YouTube URL' });
     }
+    const info = await ytdl.getInfo(videoURL);
+    const format = ytdl.chooseFormat(info.formats, { quality: 'highestvideo' });
+    res.json({ url: format.url });
+  } catch (error) {
+    res.status(500).json({ error: 'YouTube download failed', details: error.message });
+  }
 });
 
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+// === INSTAGRAM ===
+app.get('/api/instagram', async (req, res) => {
+  try {
+    const { url } = req.query;
+    const insta = new Insta();
+    const data = await insta.fetchPost(url);
+    res.json({ url: data.media });
+  } catch (error) {
+    res.status(500).json({ error: 'Instagram download failed', details: error.message });
+  }
+});
+
+// === TIKTOK ===
+app.get('/api/tiktok', async (req, res) => {
+  const { url } = req.query;
+  if (!url || !url.includes('tiktok.com')) {
+    return res.status(400).json({ error: 'Invalid TikTok URL' });
+  }
+
+  try {
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle2' });
+
+    await page.waitForSelector('video');
+    const videoUrl = await page.$eval('video', (video) => video.src);
+    await browser.close();
+
+    res.json({ url: videoUrl });
+  } catch (error) {
+    res.status(500).json({ error: 'TikTok download failed', details: error.message });
+  }
+});
+
+// === FACEBOOK ===
+app.get('/api/facebook', async (req, res) => {
+  const { url } = req.query;
+  if (!url || !url.includes('facebook.com')) {
+    return res.status(400).json({ error: 'Invalid Facebook URL' });
+  }
+
+  try {
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle2' });
+
+    await page.waitForSelector('video');
+    const videoUrl = await page.$eval('video', (video) => video.src);
+    await browser.close();
+
+    res.json({ url: videoUrl });
+  } catch (error) {
+    res.status(500).json({ error: 'Facebook download failed', details: error.message });
+  }
+});
+
+// === Start Server ===
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
