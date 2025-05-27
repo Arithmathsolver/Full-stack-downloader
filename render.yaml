@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: universal-video-downloader
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    nodeVersion: 18
