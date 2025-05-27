@@ -1,19 +1,38 @@
 async function downloadVideo() {
-    const url = document.getElementById('urlInput').value;
-    const output = document.getElementById('output');
-    output.innerHTML = "Processing...";
+  const url = document.getElementById("videoUrl").value;
+  const status = document.getElementById("status");
+  const downloadLink = document.getElementById("downloadLink");
 
-    const res = await fetch('/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-    });
+  if (!url) {
+    status.textContent = "Please paste a link.";
+    return;
+  }
 
-    const data = await res.json();
+  status.textContent = "Processing... Please wait.";
+  downloadLink.style.display = "none";
 
-    if (data.download) {
-        output.innerHTML = `<a href="${data.download}" download>Click to Download</a>`;
+  let platform = "";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) platform = "youtube";
+  else if (url.includes("tiktok.com")) platform = "tiktok";
+  else if (url.includes("instagram.com")) platform = "instagram";
+  else if (url.includes("facebook.com")) platform = "facebook";
+  else {
+    status.textContent = "Unsupported platform.";
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/${platform}?url=${encodeURIComponent(url)}`);
+    const data = await response.json();
+    if (data.url) {
+      status.textContent = "Ready to download:";
+      downloadLink.href = data.url;
+      downloadLink.style.display = "inline-block";
+      downloadLink.click(); // triggers download
     } else {
-        output.innerHTML = "Failed to fetch video.";
+      status.textContent = "Download link not found.";
     }
-}
+  } catch (err) {
+    status.textContent = "Download failed. Try again.";
+  }
+          }
