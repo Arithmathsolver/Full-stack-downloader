@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Video Downloader</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Downloader</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Paste Your Video Link</h1>
-        <input type="text" id="urlInput" placeholder="Paste video link here" />
-        <button onclick="downloadVideo()">Download</button>
-        <div id="output"></div>
-    </div>
-    <script src="script.js"></script>
+  <div class="container">
+    <h1>Universal Video Downloader</h1>
+    <input type="text" id="videoUrl" placeholder="Paste video URL here" />
+    <button onclick="downloadVideo()">Download</button>
+    <p id="status"></p>
+    <a id="downloadLink" href="#" target="_blank" download style="display:none;">Click here if it doesn't start</a>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>
