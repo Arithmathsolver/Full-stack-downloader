@@ -1,0 +1,18 @@
+{
+  "name": "universal-video-downloader",
+  "version": "1.0.0",
+  "description": "Download videos from TikTok, Instagram, YouTube, Facebook, Twitter without watermark",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ytdl-core": "^4.11.2",
+    "tiktok-scraper": "^1.4.30",
+    "puppeteer": "^21.3.8",
+    "cors": "^2.8.5",
+    "axios": "^1.6.0",
+    "insta-fetcher": "^1.1.0"
+  }
+}
