@@ -1,1 +1,46 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #121212;
+  color: #fff;
+  margin: 0;
+  padding: 0;
+}
 
+.container {
+  max-width: 500px;
+  margin: 80px auto;
+  padding: 20px;
+  text-align: center;
+}
+
+input {
+  width: 90%;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 6px;
+  border: none;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #00b894;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+button:hover {
+  background-color: #00a383;
+}
+
+#status {
+  margin-top: 15px;
+}
+
+a#downloadLink {
+  display: block;
+  margin-top: 10px;
+  color: #00cec9;
+}
