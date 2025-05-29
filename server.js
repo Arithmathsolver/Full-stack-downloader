@@ -1,215 +1,147 @@
 require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const { exec } = require('child_process');
-const fs = require('fs');
-const util = require('util');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
+const { URL } = require('url');
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Promisify exec for better async handling
-const execPromise = util.promisify(exec);
-
-// Enhanced error handling for process-level errors
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  // Perform cleanup if needed
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-});
-
-// Middlewares
-app.use(cors());
-app.use(bodyParser.json());
+// ======================
+// Middleware Setup
+// ======================
+app.use(helmet());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  methods: ['GET', 'POST']
+}));
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Request logging middleware
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests, please try again later'
+});
+app.use('/api/', limiter);
+
+// Request ID middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  if (req.body && req.body.url) {
-    console.log(`Request URL: ${req.body.url.substring(0, 50)}...`);
-  }
+  req.id = uuidv4();
   next();
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Configure downloads directory
-const downloadDir = process.env.DOWNLOAD_DIR || path.join(__dirname, 'downloads');
-
-// Ensure download directory exists and is writable
-const initializeDownloadDir = () => {
+// ======================
+// Download Functionality
+// ======================
+const validateUrl = (url) => {
   try {
-    if (!fs.existsSync(downloadDir)) {
-      fs.mkdirSync(downloadDir, { recursive: true });
-      console.log(`Created download directory at: ${downloadDir}`);
-    }
-
-    // Test write permissions
-    const testFile = path.join(downloadDir, 'permission-test.txt');
-    fs.writeFileSync(testFile, 'test');
-    fs.unlinkSync(testFile);
-    console.log(`Verified write permissions for: ${downloadDir}`);
-
-  } catch (err) {
-    console.error(`Failed to initialize download directory (${downloadDir}):`, err);
-    process.exit(1);
+    new URL(url);
+    return true;
+  } catch {
+    return false;
   }
 };
 
-initializeDownloadDir();
+const detectPlatform = (url) => {
+  const domain = new URL(url).hostname.toLowerCase();
+  if (domain.includes('tiktok')) return 'tiktok';
+  if (domain.includes('instagram')) return 'instagram';
+  if (domain.includes('youtube') || domain.includes('youtu.be')) return 'youtube';
+  if (domain.includes('facebook') || domain.includes('fb.com')) return 'facebook';
+  throw new Error('Unsupported platform');
+};
 
-// Health check endpoint
-app.get('/api/health', async (req, res) => {
-  try {
-    // Check yt-dlp availability
-    const { stdout: version } = await execPromise('yt-dlp --version');
-    
-    res.json({
-      status: 'healthy',
-      ytDlpVersion: version.trim(),
-      downloadDir,
-      diskSpace: await getDiskSpace(),
-      platform: process.platform,
-      nodeVersion: process.version
-    });
+const downloadVideo = async (platform, url) => {
+  // Mock implementation - replace with real API calls
+  return {
+    downloadUrl: `https://cdn.example.com/${platform}/${Date.now()}.mp4`,
+    noWatermark: true,
+    quality: 'hd'
+  };
+};
 
-  } catch (error) {
-    res.status(500).json({
-      status: 'unhealthy',
-      error: 'yt-dlp not available',
-      details: error.message,
-      solution: 'Ensure yt-dlp is installed in your PATH or in ./bin directory'
-    });
-  }
-});
-
-// Download endpoint with enhanced error handling
+// Download endpoint
 app.post('/api/download', async (req, res) => {
-  const { url } = req.body;
-
-  if (!url) {
-    return res.status(400).json({ 
-      success: false,
-      error: 'URL is required',
-      example: { "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }
-    });
-  }
-
-  if (!isValidUrl(url)) {
-    return res.status(400).json({ 
-      success: false,
-      error: 'Invalid URL format',
-      supportedPlatforms: ['YouTube', 'TikTok', 'Instagram', 'Facebook']
-    });
-  }
-
   try {
-    console.log(`Starting download for: ${url}`);
+    const { url } = req.body;
     
-    // Sanitize URL to prevent command injection
-    const sanitizedUrl = url.replace(/[;&|$`]/g, '');
-    
-    // Download command with progress and JSON output
-    const command = `yt-dlp -o "${downloadDir}/%(title)s.%(ext)s" --no-warnings --print-json ${sanitizedUrl}`;
-    
-    console.log(`Executing command: ${command}`);
-    const { stdout, stderr } = await execPromise(command);
-    
-    // Parse output
-    let result;
-    try {
-      const jsonLine = stdout.split('\n').find(line => line.startsWith('{'));
-      result = jsonLine ? JSON.parse(jsonLine) : { status: 'completed', output: stdout };
-    } catch (e) {
-      result = { status: 'completed', output: stdout };
+    if (!validateUrl(url)) {
+      return res.status(400).json({ 
+        error: 'Invalid URL format',
+        example: 'https://www.tiktok.com/@username/video/123456789'
+      });
     }
 
-    console.log('Download completed:', result);
-    res.json({ 
+    const platform = detectPlatform(url);
+    const result = await downloadVideo(platform, url);
+
+    res.json({
       success: true,
-      message: 'Download completed',
-      data: {
-        ...result,
-        downloadDir,
-        filePath: result._filename ? path.join(downloadDir, result._filename) : null
-      }
+      downloadUrl: result.downloadUrl,
+      platform,
+      noWatermark: result.noWatermark,
+      quality: result.quality
     });
 
   } catch (error) {
-    console.error('Download failed:', {
-      url,
-      error: error.message,
-      stderr: error.stderr,
-      stdout: error.stdout
-    });
-
-    res.status(500).json({ 
-      success: false,
-      error: 'Download failed',
-      details: error.stderr || error.message,
-      url: url,
-      possibleSolutions: [
-        'Check if the URL is correct and public',
-        'Verify yt-dlp supports this platform',
-        'Check server storage space'
-      ]
+    console.error(`[${req.id}] Download error:`, error.message);
+    res.status(500).json({
+      error: error.message || 'Download failed',
+      retry: true
     });
   }
 });
 
-// Helper functions
-function isValidUrl(string) {
-  try {
-    const url = new URL(string);
-    return ['http:', 'https:'].includes(url.protocol);
-  } catch (_) {
-    return false;
-  }
-}
-
-async function getDiskSpace() {
-  try {
-    if (process.platform === 'win32') {
-      const { stdout } = await execPromise('wmic logicaldisk get size,freespace');
-      return stdout;
-    } else {
-      const { stdout } = await execPromise('df -h');
-      return stdout;
-    }
-  } catch (error) {
-    return `Could not check disk space: ${error.message}`;
-  }
-}
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ 
-    success: false,
-    error: 'Internal server error',
-    requestId: req.id,
+// ======================
+// Additional Routes
+// ======================
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
     timestamp: new Date().toISOString()
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`
-  Server running on http://localhost:${PORT}
-  Download directory: ${downloadDir}
-  Node version: ${process.version}
-  Platform: ${process.platform}
-  `);
+// Serve frontend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Export for testing
-module.exports = app;
+// ======================
+// Error Handling
+// ======================
+app.use((err, req, res, next) => {
+  console.error(`[${req.id}] Error:`, err.stack);
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message,
+    requestId: req.id
+  });
+});
+
+// ======================
+// Server Startup
+// ======================
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+// Handle process events
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+  server.close(() => process.exit(1));
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
