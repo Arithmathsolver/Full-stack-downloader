@@ -1,6 +1,6 @@
 {
   "name": "video-downloader-server",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Enhanced Express server for downloading videos with yt-dlp",
   "main": "server.js",
   "scripts": {
@@ -8,21 +8,13 @@
     "dev": "nodemon server.js",
     "test": "jest --detectOpenHandles",
     "check-ytdlp": "yt-dlp --version || echo 'yt-dlp not installed'",
-    "setup": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp"
+    "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ./bin/yt-dlp && chmod a+rx ./bin/yt-dlp || echo 'YT-DLP installation failed'"
   },
-  "keywords": [
-    "video",
-    "downloader",
-    "yt-dlp",
-    "express",
-    "nodejs"
-  ],
   "dependencies": {
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "yt-dlp-exec": "^1.2.0"
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "jest": "^29.7.0",
