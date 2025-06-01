@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: video-downloader
-    env: docker
-    plan: free
-    repo: https://github.com/your-username/your-repo-name
-    branch: main
-    buildCommand: ""
-    startCommand: ""
