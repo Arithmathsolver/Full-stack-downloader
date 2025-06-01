@@ -1,53 +1,44 @@
 body {
-  margin: 0;
-  font-family: 'Inter', sans-serif;
-  background-color: #f9f9f9;
+  font-family: sans-serif;
+  background: #f2f2f2;
   display: flex;
   justify-content: center;
-  align-items: center;
-  height: 100vh;
-  flex-direction: column;
+  padding: 20px;
 }
 
 .container {
+  width: 100%;
+  max-width: 500px;
   background: white;
-  padding: 2rem;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-  width: 90%;
-  max-width: 400px;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
   text-align: center;
 }
 
-h1 {
-  font-size: 1.5rem;
-  color: #222;
-}
-
-p {
-  color: #666;
-  margin: 0.5rem 0 1.5rem;
-}
-
-input[type="text"] {
+input {
   width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
+  padding: 12px;
+  font-size: 16px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
 }
 
 button {
-  background-color: #0f9d58;
+  padding: 12px 20px;
+  background: #2c7be5;
   color: white;
+  font-size: 16px;
   border: none;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  width: 100%;
 }
 
 button:hover {
-  background-color: #0b7b42;
+  background: #1a68d1;
+}
+
+#videoContainer {
+  margin-top: 20px;
+}
