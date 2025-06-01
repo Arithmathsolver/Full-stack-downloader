@@ -2,20 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>All Video Downloader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Downloader</title>
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <h1>All Video Downloader</h1>
-    <p>Download videos from TikTok, YouTube, Instagram, Facebook</p>
-    <input type="text" id="videoURL" placeholder="Paste video link here">
-    <button onclick="downloadVideo()">Download</button>
-    <p class="note">* Supported platforms: TikTok, YouTube, Facebook, Instagram</p>
+    <h1>Video Downloader</h1>
+    <input type="text" id="videoUrl" placeholder="Paste video link here..." />
+    <button id="downloadBtn">Download</button>
+    <div id="videoContainer"></div>
   </div>
-
   <script src="script.js"></script>
 </body>
 </html>
