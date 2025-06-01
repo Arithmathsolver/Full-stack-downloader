@@ -1,44 +1,32 @@
-body {
-  font-family: sans-serif;
-  background: #f2f2f2;
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-}
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  const videoUrl = document.getElementById('videoUrl').value.trim();
+  const videoContainer = document.getElementById('videoContainer');
+  videoContainer.innerHTML = 'Processing...';
 
-.container {
-  width: 100%;
-  max-width: 500px;
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-  text-align: center;
-}
+  try {
+    const response = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: videoUrl })
+    });
 
-input {
-  width: 100%;
-  padding: 12px;
-  font-size: 16px;
-  margin: 10px 0;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
+    const data = await response.json();
 
-button {
-  padding: 12px 20px;
-  background: #2c7be5;
-  color: white;
-  font-size: 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #1a68d1;
-}
-
-#videoContainer {
-  margin-top: 20px;
-}
+    if (data.success && data.downloadUrl) {
+      videoContainer.innerHTML = `
+        <video width="100%" controls>
+          <source src="${data.downloadUrl}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+        <br/>
+        <a href="${data.downloadUrl}" download>
+          <button>Download Video</button>
+        </a>
+      `;
+    } else {
+      videoContainer.innerHTML = `<p>Error: ${data.message}</p>`;
+    }
+  } catch (error) {
+    videoContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+  }
+});
