@@ -1,32 +1,34 @@
 document.getElementById('downloadBtn').addEventListener('click', async () => {
-  const videoUrl = document.getElementById('videoUrl').value.trim();
-  const videoContainer = document.getElementById('videoContainer');
-  videoContainer.innerHTML = 'Processing...';
+  const videoUrl = document.getElementById('videoUrl').value;
+  const message = document.getElementById('message');
+  const downloadLink = document.getElementById('downloadLink');
+
+  if (!videoUrl.trim()) {
+    message.textContent = 'Please paste a valid video URL.';
+    return;
+  }
+
+  message.textContent = 'Processing... Please wait.';
+  downloadLink.hidden = true;
 
   try {
-    const response = await fetch('/api/download', {
+    const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: videoUrl })
+      body: JSON.stringify({ videoUrl })
     });
 
-    const data = await response.json();
+    const data = await res.json();
 
-    if (data.success && data.downloadUrl) {
-      videoContainer.innerHTML = `
-        <video width="100%" controls>
-          <source src="${data.downloadUrl}" type="video/mp4">
-          Your browser does not support the video tag.
-        </video>
-        <br/>
-        <a href="${data.downloadUrl}" download>
-          <button>Download Video</button>
-        </a>
-      `;
+    if (data.success) {
+      downloadLink.href = data.downloadUrl;
+      downloadLink.hidden = false;
+      message.textContent = 'Download ready:';
     } else {
-      videoContainer.innerHTML = `<p>Error: ${data.message}</p>`;
+      message.textContent = data.message;
     }
   } catch (error) {
-    videoContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+    message.textContent = 'Error contacting server.';
+    console.error(error);
   }
 });
