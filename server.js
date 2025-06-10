@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const ytdlp = require('youtube-dl-exec'); // changed from yt-dlp-exec
+const { execFile } = require('child_process');
 const puppeteer = require('puppeteer');
 require('dotenv').config();
 
@@ -30,19 +30,31 @@ app.post('/api/download', async (req, res) => {
 
   try {
     if (isYouTube(videoUrl)) {
-      const info = await ytdlp(videoUrl, {
-        format: quality || 'best',
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCheckCertificates: true,
-      });
+      execFile('yt-dlp', [
+        videoUrl,
+        '-f', quality || 'best',
+        '--dump-json',
+        '--no-warnings',
+        '--no-check-certificate'
+      ], (error, stdout, stderr) => {
+        if (error) {
+          console.error('yt-dlp error:', stderr || error.message);
+          return res.status(500).json({ success: false, message: 'YouTube download failed.' });
+        }
 
-      const video = info.url || info.formats?.find(f => f.url)?.url;
-      if (video) {
-        return res.json({ success: true, downloadUrl: video });
-      } else {
-        return res.status(400).json({ success: false, message: 'Could not find video URL' });
-      }
+        try {
+          const info = JSON.parse(stdout);
+          const video = info.url || (info.formats && info.formats.find(f => f.url)?.url);
+          if (video) {
+            return res.json({ success: true, downloadUrl: video });
+          } else {
+            return res.status(400).json({ success: false, message: 'Could not find video URL' });
+          }
+        } catch (parseError) {
+          return res.status(500).json({ success: false, message: 'Failed to parse video info.' });
+        }
+      });
+      return;
     }
 
     if (isTikTok(videoUrl) || isInstagram(videoUrl) || isFacebook(videoUrl)) {
