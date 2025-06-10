@@ -1,35 +1,38 @@
-node_require('dotenv').config();
 const express = require('express');
-const fetch = require('node-fetch');
-const path = require('path');
-const bodyParser = require('body-parser');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
 
 const app = express();
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
 
 app.post('/api/download', async (req, res) => {
-  const videoUrl = req.body.url;
-  const apifyToken = process.env.APIFY_TOKEN;
+  const { videoUrl } = req.body;
+  const apifyApiKey = process.env.APIFY_API_KEY;
 
   try {
-    const response = await fetch(`https://api.apify.com/v2/acts/hariprasadh10792~ultimate-youtube-downloader/run-sync-get-dataset-items?token=${apifyToken}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: [videoUrl] })
-    });
+    const response = await axios.post(
+      'https://api.apify.com/v2/actor-tasks/apify/video-downloader/run-sync-get-dataset-items?token=' + apifyApiKey,
+      {
+        url: videoUrl
+      }
+    );
 
-    const data = await response.json();
-
-    if (data && data.length > 0 && data[0].downloadUrl) {
-      res.json({ success: true, downloadUrl: data[0].downloadUrl });
+    if (response.data.length > 0 && response.data[0].videoUrl) {
+      return res.json({ success: true, downloadUrl: response.data[0].videoUrl });
     } else {
-      res.json({ success: false, message: 'Unable to fetch video link.' });
+      return res.status(400).json({ success: false, message: 'No video found or unsupported URL.' });
     }
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error(error.message);
+    return res.status(500).json({ success: false, message: 'Server error while fetching video.' });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
