@@ -1,34 +1,31 @@
-document.getElementById('downloadBtn').addEventListener('click', async () => {
-  const videoUrl = document.getElementById('videoUrl').value;
-  const message = document.getElementById('message');
-  const downloadLink = document.getElementById('downloadLink');
+async function downloadVideo() {
+  const url = document.getElementById('videoUrl').value;
+  const quality = document.getElementById('quality').value;
+  const status = document.getElementById('status');
 
-  if (!videoUrl.trim()) {
-    message.textContent = 'Please paste a valid video URL.';
+  if (!url) {
+    status.innerHTML = "❌ Please paste a video URL.";
     return;
   }
 
-  message.textContent = 'Processing... Please wait.';
-  downloadLink.hidden = true;
+  status.innerHTML = "⏳ Processing... Please wait.";
 
   try {
     const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoUrl })
+      body: JSON.stringify({ videoUrl: url, quality })
     });
 
     const data = await res.json();
 
-    if (data.success) {
-      downloadLink.href = data.downloadUrl;
-      downloadLink.hidden = false;
-      message.textContent = 'Download ready:';
+    if (data.success && data.downloadUrl) {
+      status.innerHTML = `<a href="${data.downloadUrl}" target="_blank" download>✅ Click here to download your video</a>`;
     } else {
-      message.textContent = data.message;
+      status.innerHTML = `❌ ${data.message || "Unable to fetch download link."}`;
     }
-  } catch (error) {
-    message.textContent = 'Error contacting server.';
-    console.error(error);
+  } catch (err) {
+    console.error(err);
+    status.innerHTML = "❌ Server error.";
   }
-});
+}
