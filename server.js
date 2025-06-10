@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const ytdlp = require('yt-dlp-exec');
+const ytdlp = require('youtube-dl-exec'); // changed from yt-dlp-exec
 const puppeteer = require('puppeteer');
 require('dotenv').config();
 
