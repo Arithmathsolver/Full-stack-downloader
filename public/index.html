@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Downloader</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <h1>Video Downloader</h1>
-    <input type="text" id="videoUrl" placeholder="Paste video link here..." />
+    <input type="text" id="videoUrl" placeholder="Paste video link here">
     <button id="downloadBtn">Download</button>
-    <div id="videoContainer"></div>
+    <p id="message"></p>
+    <a id="downloadLink" href="#" download hidden>Click here to download</a>
   </div>
   <script src="script.js"></script>
 </body>
