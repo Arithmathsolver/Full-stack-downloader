@@ -16,10 +16,9 @@ app.post('/api/download', async (req, res) => {
 
   try {
     const response = await axios.post(
-      'https://api.apify.com/v2/actor-tasks/apify/video-downloader/run-sync-get-dataset-items?token=' + apifyApiKey,
-      {
-        url: videoUrl
-      }
+      `https://api.apify.com/v2/acts/apify~video-downloader/run-sync-get-dataset-items?token=${apifyApiKey}`,
+      { url: videoUrl },
+      { headers: { 'Content-Type': 'application/json' } }
     );
 
     if (response.data.length > 0 && response.data[0].videoUrl) {
@@ -28,11 +27,11 @@ app.post('/api/download', async (req, res) => {
       return res.status(400).json({ success: false, message: 'No video found or unsupported URL.' });
     }
   } catch (error) {
-    console.error(error.message);
+    console.error('Apify error:', error.response?.data || error.message);
     return res.status(500).json({ success: false, message: 'Server error while fetching video.' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`✅ Server is running on port ${PORT}`);
 });
