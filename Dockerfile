@@ -1,19 +1,12 @@
-# Use Node base image
-FROM node:18-slim
+# ✅ Use Node base image with Chrome pre-installed
+FROM zenika/node:18-chrome
 
 # Create app directory
 WORKDIR /app
 
-# Install yt-dlp, ffmpeg, and Google Chrome for Puppeteer
+# Install yt-dlp and ffmpeg
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip ffmpeg wget gnupg ca-certificates && \
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg && \
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-    > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y google-chrome-stable \
-    libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libasound2 \
-    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libgbm1 libgtk-3-0 libxshmfence1 && \
+    apt-get install -y python3 python3-pip ffmpeg && \
     pip3 install yt-dlp && \
     rm -rf /var/lib/apt/lists/*
 
