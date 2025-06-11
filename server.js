@@ -60,6 +60,7 @@ app.post('/api/download', async (req, res) => {
     if (isTikTok(videoUrl) || isInstagram(videoUrl) || isFacebook(videoUrl)) {
       const browser = await puppeteer.launch({
         headless: 'new',
+        executablePath: '/usr/bin/chromium-browser', // ✅ only change made
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
 
