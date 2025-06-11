@@ -8,11 +8,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Install yt-dlp, ffmpeg, and Chromium for Puppeteer
+# Install yt-dlp, ffmpeg, and Google Chrome for Puppeteer
 RUN apt-get update && \
     apt-get install -y python3 python3-pip ffmpeg wget gnupg ca-certificates && \
-    wget -qO - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
+    mkdir -p /etc/apt/keyrings && \
+    wget -qO /etc/apt/keyrings/google-linux-signing-key.gpg https://dl.google.com/linux/linux_signing_key.pub && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-linux-signing-key.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && \
     apt-get install -y google-chrome-stable \
     libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libasound2 \
