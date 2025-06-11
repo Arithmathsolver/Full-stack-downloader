@@ -7,9 +7,10 @@ USER root
 # Create app directory
 WORKDIR /app
 
-# Install required packages: Python, pip, ffmpeg, curl
+# Install required packages
 RUN apk update && \
-    apk add --no-cache python3 py3-pip ffmpeg curl && \
+    apk add --no-cache python3 py3-pip ffmpeg curl chromium && \
+    ln -sf python3 /usr/bin/python && \
     curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp
 
@@ -25,8 +26,8 @@ RUN npm install
 # Copy application source
 COPY . .
 
-# Expose the server port
+# Expose port
 EXPOSE 3000
 
-# Start the Node.js server
+# Start the server
 CMD ["node", "server.js"]
