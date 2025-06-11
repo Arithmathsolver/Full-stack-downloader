@@ -1,31 +1,41 @@
 async function downloadVideo() {
-  const url = document.getElementById('videoUrl').value;
-  const quality = document.getElementById('quality').value;
-  const status = document.getElementById('status');
-
-  if (!url) {
-    status.innerHTML = "❌ Please paste a video URL.";
-    return;
-  }
-
-  status.innerHTML = "⏳ Processing... Please wait.";
-
-  try {
-    const res = await fetch('/api/download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoUrl: url, quality })
-    });
-
-    const data = await res.json();
-
-    if (data.success && data.downloadUrl) {
-      status.innerHTML = `<a href="${data.downloadUrl}" target="_blank" download>✅ Click here to download your video</a>`;
-    } else {
-      status.innerHTML = `❌ ${data.message || "Unable to fetch download link."}`;
+    const videoUrl = document.getElementById('videoUrl').value.trim();
+    const statusDiv = document.getElementById('status');
+    
+    if (!videoUrl) {
+        statusDiv.innerHTML = 'Please enter a YouTube URL';
+        return;
     }
-  } catch (err) {
-    console.error(err);
-    status.innerHTML = "❌ Server error.";
-  }
-}
+
+    statusDiv.innerHTML = 'Downloading...';
+    
+    try {
+        const response = await fetch('/download', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `url=${encodeURIComponent(videoUrl)}`
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Download failed');
+        }
+        
+        statusDiv.innerHTML = 'Download complete!';
+        
+        // Create download link
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `/downloads/${encodeURIComponent(data.filename)}`;
+        downloadLink.download = true;
+        downloadLink.innerHTML = 'Click to save video';
+        statusDiv.appendChild(document.createElement('br'));
+        statusDiv.appendChild(downloadLink);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        statusDiv.innerHTML = `Error: ${error.message}`;
+    }
+    }
