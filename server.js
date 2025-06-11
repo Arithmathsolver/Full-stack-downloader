@@ -31,11 +31,12 @@ app.post('/api/download', async (req, res) => {
   try {
     if (isYouTube(videoUrl)) {
       execFile('yt-dlp', [
-        videoUrl,
+        '--no-playlist',
         '-f', quality || 'best',
         '--dump-json',
         '--no-warnings',
-        '--no-check-certificate'
+        '--no-check-certificate',
+        videoUrl
       ], (error, stdout, stderr) => {
         if (error) {
           console.error('yt-dlp error:', stderr || error.message);
@@ -43,6 +44,7 @@ app.post('/api/download', async (req, res) => {
         }
 
         try {
+          if (!stdout) throw new Error('yt-dlp did not return output');
           const info = JSON.parse(stdout);
           const video = info.url || (info.formats && info.formats.find(f => f.url)?.url);
           if (video) {
@@ -51,6 +53,7 @@ app.post('/api/download', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Could not find video URL' });
           }
         } catch (parseError) {
+          console.error('JSON parse error:', parseError.message);
           return res.status(500).json({ success: false, message: 'Failed to parse video info.' });
         }
       });
@@ -60,7 +63,7 @@ app.post('/api/download', async (req, res) => {
     if (isTikTok(videoUrl) || isInstagram(videoUrl) || isFacebook(videoUrl)) {
       const browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/usr/bin/chromium-browser', // ✅ only change made
+        executablePath: '/usr/bin/chromium-browser',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
 
