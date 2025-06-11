@@ -1,6 +1,9 @@
 # ✅ Use Zenika image with Node.js + Chrome preinstalled
 FROM zenika/alpine-chrome:with-node
 
+# Switch to root to install packages
+USER root
+
 # Create app directory
 WORKDIR /app
 
