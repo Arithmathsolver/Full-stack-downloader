@@ -128,14 +128,14 @@ app.post('/download', async (req, res) => {
       
       try {
         await page.goto('https://ssstik.io/en', { 
-          waitUntil: 'networkidle2',
-          timeout: 30000 
+          waitUntil: 'domcontentloaded',
+          timeout: 20000 
         });
 
         await page.type('#main_page_text', url);
         await page.click('#submit');
-        await page.waitForSelector('.result_overlay', { 
-          timeout: 30000 
+        await page.waitForSelector('.result_overlay, a.pure-button-primary', { 
+          timeout: 20000 
         });
 
         const downloadUrl = await page.evaluate(() => {
