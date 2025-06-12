@@ -1,56 +1,58 @@
 async function downloadVideo() {
     const videoUrl = document.getElementById('videoUrl').value.trim();
+    const quality = document.getElementById('quality').value;
     const statusDiv = document.getElementById('status');
     
-    if (!videoUrl) {
-        statusDiv.innerHTML = 'Please enter a YouTube URL';
-        return;
-    }
-
-    statusDiv.innerHTML = 'Starting download...';
+    statusDiv.innerHTML = '<div class="loading">Starting download...</div>';
     
     try {
         const response = await fetch('/download', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: `url=${encodeURIComponent(videoUrl)}`
+            body: JSON.stringify({
+                url: videoUrl,
+                quality: quality || 'best'
+            })
         });
 
-        // First check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const errorText = await response.text();
-            throw new Error(`Server returned: ${errorText.substring(0, 100)}`);
+        // Check for errors
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Download failed');
         }
 
         const data = await response.json();
         
-        if (!response.ok) {
-            throw new Error(data.message || `Download failed (status ${response.status})`);
+        if (data.downloadUrl) {
+            // For TikTok/Instagram/Facebook - direct download
+            statusDiv.innerHTML = '<div class="success">Video ready!</div>';
+            const directLink = document.createElement('a');
+            directLink.href = data.downloadUrl;
+            directLink.className = 'download-link';
+            directLink.textContent = 'Click to download';
+            directLink.target = '_blank';
+            statusDiv.appendChild(directLink);
+        } else if (data.filename) {
+            // For YouTube - server download
+            statusDiv.innerHTML = '<div class="success">Processing video...</div>';
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `/downloads/${encodeURIComponent(data.filename)}`;
+            downloadLink.className = 'download-link';
+            downloadLink.textContent = 'Click to download';
+            downloadLink.download = true;
+            
+            statusDiv.innerHTML = '<div class="success">Download ready!</div>';
+            statusDiv.appendChild(document.createElement('br'));
+            statusDiv.appendChild(downloadLink);
+        } else {
+            throw new Error('No download URL or filename received');
         }
-        
-        statusDiv.innerHTML = 'Processing video...';
-        
-        // Create download link
-        const downloadLink = document.createElement('a');
-        downloadLink.href = `/downloads/${encodeURIComponent(data.filename)}`;
-        downloadLink.innerHTML = 'Click here to download';
-        downloadLink.style.display = 'block';
-        downloadLink.style.marginTop = '10px';
-        downloadLink.style.color = 'blue';
-        downloadLink.style.textDecoration = 'underline';
-        
-        // Clear previous content and add new
-        statusDiv.innerHTML = 'Download ready!';
-        statusDiv.appendChild(document.createElement('br'));
-        statusDiv.appendChild(downloadLink);
         
     } catch (error) {
         console.error('Download error:', error);
-        // Clean error message by removing HTML tags if present
-        const cleanError = error.message.replace(/<[^>]*>?/gm, '');
-        statusDiv.innerHTML = `Error: ${cleanError}`;
+        statusDiv.innerHTML = `<div class="error">Error: ${error.message.replace('Error:', '').trim()}</div>`;
     }
-                                                                    }
+                   }
