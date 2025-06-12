@@ -2,19 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { exec } = require('child_process');
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
-const axios = require('axios');
 require('dotenv').config();
-
-// Enhanced stealth mode for Puppeteer
-puppeteer.use(StealthPlugin());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DOWNLOAD_FOLDER = path.join(__dirname, 'downloads');
-const PROXY_SERVERS = process.env.PROXY_SERVERS ? process.env.PROXY_SERVERS.split(',') : [];
 
 // Create downloads folder if not exists
 if (!fs.existsSync(DOWNLOAD_FOLDER)) {
@@ -33,124 +27,69 @@ const platformDetectors = {
   facebook: url => url.includes('facebook.com') || url.includes('fb.watch')
 };
 
-// Rotating proxy function
-function getRandomProxy() {
-  if (PROXY_SERVERS.length === 0) return '';
-  return `--proxy ${PROXY_SERVERS[Math.floor(Math.random() * PROXY_SERVERS.length)]}`;
-}
-
-// YouTube download handler with multiple fallback methods
+// YouTube download handler with bot avoidance
 async function handleYouTubeDownload(url, quality, res) {
-  const methods = [
-    attemptYtDlpDirectDownload,
-    attemptBrowserAutomationDownload,
-    attemptThirdPartyApiDownload
-  ];
+  const filename = `yt_${Date.now()}.mp4`;
+  const filepath = path.join(DOWNLOAD_FOLDER, filename);
+  const cookiesPath = path.join(__dirname, 'cookies.txt');
 
-  for (const method of methods) {
-    try {
-      const result = await method(url, quality);
-      if (result.success) return res.json(result);
-    } catch (error) {
-      console.log(`Method failed: ${method.name}`, error.message);
-    }
+  // Base command with bot avoidance measures
+  let command = `yt-dlp \
+    --no-playlist \
+    --force-ipv4 \
+    --socket-timeout 30 \
+    --retries 5 \
+    --throttled-rate 1M \
+    --limit-rate 2M \
+    --sleep-interval 5 \
+    --max-sleep-interval 15 \
+    --fragment-retries 10 \
+    --buffer-size 32K \
+    -f "${quality || 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'}" \
+    -o "${filepath}"`;
+
+  // Add cookies if available
+  if (fs.existsSync(cookiesPath)) {
+    command += ` --cookies ${cookiesPath}`;
+  } else {
+    console.warn('No cookies.txt found - some videos may require authentication');
   }
 
-  return res.status(500).json({
-    success: false,
-    message: 'All download methods failed. Please try again later.'
-  });
-}
+  command += ` ${url}`;
 
-// Method 1: Direct yt-dlp download with proxy rotation
-async function attemptYtDlpDirectDownload(url, quality) {
-  return new Promise((resolve, reject) => {
-    const filename = `yt_${Date.now()}.mp4`;
-    const filepath = path.join(DOWNLOAD_FOLDER, filename);
-    const proxy = getRandomProxy();
-    
-    const command = `yt-dlp \
-      ${proxy} \
-      --no-playlist \
-      --geo-bypass \
-      --force-ipv4 \
-      --socket-timeout 30 \
-      --retries 3 \
-      --throttled-rate 1M \
-      --limit-rate 2M \
-      --sleep-interval 10 \
-      --max-sleep-interval 30 \
-      -f "${quality || 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'}" \
-      -o "${filepath}" \
-      ${url}`;
-
+  return new Promise((resolve) => {
     exec(command, (error, stdout, stderr) => {
-      if (error || !fs.existsSync(filepath)) {
-        return reject(new Error(stderr || 'Direct download failed'));
+      if (error) {
+        console.error('YouTube Download Error:', stderr || error.message);
+        
+        // Handle rate limiting specifically
+        if (stderr.includes('429') || stderr.includes('Too Many Requests')) {
+          return res.status(429).json({
+            success: false,
+            message: 'YouTube rate limit exceeded. Please try again later or use cookies for authentication.'
+          });
+        }
+
+        return res.status(500).json({
+          success: false,
+          message: 'YouTube download failed: ' + (stderr || error.message)
+        });
       }
 
-      resolve({
+      if (!fs.existsSync(filepath)) {
+        return res.status(500).json({
+          success: false,
+          message: 'Downloaded file not found'
+        });
+      }
+
+      resolve(res.json({
         success: true,
         filename: filename,
-        message: 'Download completed via direct method'
-      });
+        message: 'Download completed successfully'
+      }));
     });
   });
-}
-
-// Method 2: Browser automation download
-async function attemptBrowserAutomationDownload(url, quality) {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-blink-features=AutomationControlled'
-    ],
-    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser'
-  });
-
-  try {
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    await page.setViewport({ width: 1920, height: 1080 });
-    await page.goto('https://en.savefrom.net/', { 
-      waitUntil: 'networkidle2',
-      timeout: 60000 
-    });
-    await page.type('#sf_url', url);
-    await page.click('#sf_submit');
-    await page.waitForSelector('.def-btn-box', { timeout: 60000 });
-    
-    const downloadUrl = await page.evaluate(() => {
-      const link = document.querySelector('.def-btn[name="download"]');
-      return link ? link.href : null;
-    });
-
-    if (!downloadUrl) throw new Error('Download link not found');
-    
-    return {
-      success: true,
-      downloadUrl: downloadUrl,
-      message: 'Download available via browser automation'
-    };
-  } finally {
-    await browser.close();
-  }
-}
-
-// Method 3: Third-party API fallback
-async function attemptThirdPartyApiDownload(url) {
-  const response = await axios.get(`https://api.vevioz.com/api/button/mp4/${encodeURIComponent(url)}`);
-  if (response.data?.url) {
-    return {
-      success: true,
-      downloadUrl: response.data.url,
-      message: 'Download available via third-party API'
-    };
-  }
-  throw new Error('Third-party API failed');
 }
 
 // Download endpoint
@@ -165,7 +104,7 @@ app.post('/download', async (req, res) => {
       });
     }
 
-    // YouTube handling with multiple fallback methods
+    // YouTube handling
     if (platformDetectors.youtube(url)) {
       return await handleYouTubeDownload(url, quality, res);
     }
