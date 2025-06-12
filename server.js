@@ -25,15 +25,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Enhanced platform detection
+const platformDetectors = {
+  youtube: url => url.includes('youtube.com') || url.includes('youtu.be'),
+  tiktok: url => url.includes('tiktok.com'),
+  instagram: url => url.includes('instagram.com'),
+  facebook: url => url.includes('facebook.com') || url.includes('fb.watch')
+};
+
 // Rotating proxy function
 function getRandomProxy() {
   if (PROXY_SERVERS.length === 0) return '';
-  const proxy = PROXY_SERVERS[Math.floor(Math.random() * PROXY_SERVERS.length)];
-  return `--proxy ${proxy}`;
+  return `--proxy ${PROXY_SERVERS[Math.floor(Math.random() * PROXY_SERVERS.length)]}`;
 }
 
-// YouTube download through multiple methods
-async function downloadYouTubeVideo(url, quality, res) {
+// YouTube download handler with multiple fallback methods
+async function handleYouTubeDownload(url, quality, res) {
   const methods = [
     attemptYtDlpDirectDownload,
     attemptBrowserAutomationDownload,
@@ -73,7 +80,7 @@ async function attemptYtDlpDirectDownload(url, quality) {
       --limit-rate 2M \
       --sleep-interval 10 \
       --max-sleep-interval 30 \
-      -f "${quality || 'best'}" \
+      -f "${quality || 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'}" \
       -o "${filepath}" \
       ${url}`;
 
@@ -91,31 +98,37 @@ async function attemptYtDlpDirectDownload(url, quality) {
   });
 }
 
-// Method 2: Browser automation
-async function attemptBrowserAutomationDownload(url) {
+// Method 2: Browser automation download
+async function attemptBrowserAutomationDownload(url, quality) {
   const browser = await puppeteer.launch({
     headless: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage'
-    ]
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled'
+    ],
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser'
   });
 
   try {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
-    await page.goto('https://en.savefrom.net/', { timeout: 60000 });
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.goto('https://en.savefrom.net/', { 
+      waitUntil: 'networkidle2',
+      timeout: 60000 
+    });
     await page.type('#sf_url', url);
     await page.click('#sf_submit');
     await page.waitForSelector('.def-btn-box', { timeout: 60000 });
     
     const downloadUrl = await page.evaluate(() => {
-      return document.querySelector('.def-btn[name="download"]')?.href;
+      const link = document.querySelector('.def-btn[name="download"]');
+      return link ? link.href : null;
     });
 
-    if (!downloadUrl) throw new Error('No download link found');
+    if (!downloadUrl) throw new Error('Download link not found');
     
     return {
       success: true,
@@ -153,26 +166,102 @@ app.post('/download', async (req, res) => {
     }
 
     // YouTube handling with multiple fallback methods
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      return await downloadYouTubeVideo(url, quality, res);
+    if (platformDetectors.youtube(url)) {
+      return await handleYouTubeDownload(url, quality, res);
     }
 
-    // Other platforms handling...
-    // ... (keep existing TikTok/Instagram/Facebook code)
+    // TikTok/Instagram/Facebook handling
+    if (platformDetectors.tiktok(url) || 
+        platformDetectors.instagram(url) || 
+        platformDetectors.facebook(url)) {
+      
+      const browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ]
+      });
+
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+      
+      try {
+        await page.goto('https://ssstik.io/en', { 
+          waitUntil: 'networkidle2',
+          timeout: 30000 
+        });
+
+        await page.type('#main_page_text', url);
+        await page.click('#submit');
+        await page.waitForSelector('.result_overlay', { 
+          timeout: 30000 
+        });
+
+        const downloadUrl = await page.evaluate(() => {
+          const link = document.querySelector('a.pure-button-primary');
+          return link ? link.href : null;
+        });
+
+        if (!downloadUrl) {
+          throw new Error('Could not extract download link');
+        }
+
+        return res.json({ 
+          success: true, 
+          downloadUrl 
+        });
+      } finally {
+        await browser.close();
+      }
+    }
+
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Unsupported platform' 
+    });
 
   } catch (error) {
     console.error('Server Error:', error);
     return res.status(500).json({ 
       success: false, 
-      message: error.message.includes('timeout') ? 
-        'Connection timeout. Please try again.' : 
-        error.message 
+      message: 'Server error: ' + error.message 
     });
   }
 });
 
-// ... (keep other endpoints the same)
+// File download endpoint
+app.get('/downloads/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filepath = path.join(DOWNLOAD_FOLDER, filename);
+
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ 
+      success: false, 
+      message: 'File not found' 
+    });
+  }
+
+  res.download(filepath, filename, (err) => {
+    if (err) {
+      console.error('File Download Error:', err);
+      res.status(500).json({ 
+        success: false, 
+        message: 'File download failed' 
+      });
+    }
+    
+    // Clean up file after download completes
+    try {
+      fs.unlinkSync(filepath);
+    } catch (cleanupError) {
+      console.error('File Cleanup Error:', cleanupError);
+    }
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📁 Download folder: ${DOWNLOAD_FOLDER}`);
 });
