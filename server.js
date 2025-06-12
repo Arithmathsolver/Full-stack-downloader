@@ -1,6 +1,5 @@
-d folder: ${DOWNLOAD_FOLDER}`);
-});
-const express = require('express');
+er running on port ${PORT}`);
+}const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { exec } = require('child_process');
@@ -30,12 +29,11 @@ app.use(express.static('public'));
 // Rotating proxy function
 function getRandomProxy() {
   if (PROXY_SERVERS.length === 0) return '';
-  const proxy = PROXY_SERVERS[Math.floor(Math.random() * PROXY_SERVERS.length)];
-  return `--proxy ${proxy}`;
+  return `--proxy ${PROXY_SERVERS[Math.floor(Math.random() * PROXY_SERVERS.length)]}`;
 }
 
 // YouTube download through multiple methods
-async function downloadYouTubeVideo(url, quality, res) {
+async function youtubeBrowserDownload(url, quality, res) {
   const methods = [
     attemptYtDlpDirectDownload,
     attemptBrowserAutomationDownload,
@@ -93,31 +91,37 @@ async function attemptYtDlpDirectDownload(url, quality) {
   });
 }
 
-// Method 2: Browser automation
+// Method 2: Browser automation (existing method)
 async function attemptBrowserAutomationDownload(url) {
   const browser = await puppeteer.launch({
     headless: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage'
-    ]
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled'
+    ],
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser'
   });
 
   try {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
-    await page.goto('https://en.savefrom.net/', { timeout: 60000 });
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.goto('https://en.savefrom.net/', { 
+      waitUntil: 'networkidle2',
+      timeout: 60000 
+    });
     await page.type('#sf_url', url);
     await page.click('#sf_submit');
     await page.waitForSelector('.def-btn-box', { timeout: 60000 });
     
     const downloadUrl = await page.evaluate(() => {
-      return document.querySelector('.def-btn[name="download"]')?.href;
+      const link = document.querySelector('.def-btn[name="download"]');
+      return link ? link.href : null;
     });
 
-    if (!downloadUrl) throw new Error('No download link found');
+    if (!downloadUrl) throw new Error('Download link not found');
     
     return {
       success: true,
@@ -142,7 +146,7 @@ async function attemptThirdPartyApiDownload(url) {
   throw new Error('Third-party API failed');
 }
 
-// Download endpoint
+// Existing download endpoint (updated to use multi-method system)
 app.post('/download', async (req, res) => {
   const { url, quality } = req.body;
 
@@ -156,14 +160,14 @@ app.post('/download', async (req, res) => {
 
     // YouTube handling with multiple fallback methods
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      return await downloadYouTubeVideo(url, quality, res);
+      return await youtubeBrowserDownload(url, quality, res);
     }
 
     // Other platforms handling...
-    // ... (keep existing TikTok/Instagram/Facebook code)
+    // ... (keep your existing TikTok/Instagram/Facebook code here)
 
   } catch (error) {
-    console.error('Server Error:', error);
+    console.error('Download Error:', error);
     return res.status(500).json({ 
       success: false, 
       message: error.message.includes('timeout') ? 
@@ -173,8 +177,7 @@ app.post('/download', async (req, res) => {
   }
 });
 
-// ... (keep other endpoints the same)
-
+// Keep all other existing endpoints and functionality
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
