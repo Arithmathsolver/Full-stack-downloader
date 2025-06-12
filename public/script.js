@@ -3,6 +3,7 @@ async function downloadVideo() {
     const quality = document.getElementById('quality').value;
     const statusDiv = document.getElementById('status');
     
+    // Clear previous messages
     statusDiv.innerHTML = '<div class="loading">Starting download...</div>';
     
     try {
@@ -17,16 +18,28 @@ async function downloadVideo() {
             })
         });
 
-        // Check for errors
+        // Check for HTTP errors
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Download failed');
+            
+            // Special handling for rate limiting
+            if (response.status === 429) {
+                throw new Error(`
+                    YouTube has temporarily blocked our requests.<br><br>
+                    Please try:<br>
+                    1. Waiting 1-2 hours<br>
+                    2. Using a different network/VPN<br>
+                    3. Using the official YouTube app instead
+                `);
+            }
+            
+            throw new Error(errorData.message || `Download failed (status ${response.status})`);
         }
 
         const data = await response.json();
         
         if (data.downloadUrl) {
-            // For TikTok/Instagram/Facebook - direct download
+            // For TikTok/Instagram/Facebook
             statusDiv.innerHTML = '<div class="success">Video ready!</div>';
             const directLink = document.createElement('a');
             directLink.href = data.downloadUrl;
@@ -35,7 +48,7 @@ async function downloadVideo() {
             directLink.target = '_blank';
             statusDiv.appendChild(directLink);
         } else if (data.filename) {
-            // For YouTube - server download
+            // For YouTube
             statusDiv.innerHTML = '<div class="success">Processing video...</div>';
             
             const downloadLink = document.createElement('a');
@@ -53,6 +66,11 @@ async function downloadVideo() {
         
     } catch (error) {
         console.error('Download error:', error);
-        statusDiv.innerHTML = `<div class="error">Error: ${error.message.replace('Error:', '').trim()}</div>`;
+        statusDiv.innerHTML = `
+            <div class="error">
+                <strong>Error:</strong><br>
+                ${error.message.replace('Error:', '').trim()}
+            </div>
+        `;
     }
-                   }
+                }
