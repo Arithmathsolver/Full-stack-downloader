@@ -61,7 +61,7 @@ async function handleYouTubeDownload(url, quality, res) {
     exec(command, (error, stdout, stderr) => {
       if (error) {
         console.error('YouTube Download Error:', stderr || error.message);
-        
+
         // Handle rate limiting specifically
         if (stderr.includes('429') || stderr.includes('Too Many Requests')) {
           return res.status(429).json({
@@ -109,11 +109,11 @@ app.post('/download', async (req, res) => {
       return await handleYouTubeDownload(url, quality, res);
     }
 
-    // TikTok/Instagram/Facebook handling
+    // TikTok / Instagram / Facebook
     if (platformDetectors.tiktok(url) || 
         platformDetectors.instagram(url) || 
         platformDetectors.facebook(url)) {
-      
+
       const browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -125,32 +125,63 @@ app.post('/download', async (req, res) => {
 
       const page = await browser.newPage();
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-      
+
       try {
-        await page.goto('https://ssstik.io/en', { 
+        let toolUrl = '';
+        let inputSelector = '';
+        let buttonSelector = '';
+        let resultSelector = '';
+        let evaluateFn;
+
+        if (platformDetectors.tiktok(url)) {
+          toolUrl = 'https://ssstik.io/en';
+          inputSelector = '#main_page_text';
+          buttonSelector = '#submit';
+          resultSelector = '.result_overlay';
+          evaluateFn = () => {
+            const link = document.querySelector('a.pure-button-primary');
+            return link ? link.href : null;
+          };
+        } else if (platformDetectors.instagram(url)) {
+          toolUrl = 'https://save-insta.app/en';
+          inputSelector = 'input[name="url"]';
+          buttonSelector = 'button[type="submit"]';
+          resultSelector = '.download-items a';
+          evaluateFn = () => {
+            const link = document.querySelector('.download-items a');
+            return link ? link.href : null;
+          };
+        } else if (platformDetectors.facebook(url)) {
+          toolUrl = 'https://fdown.net/';
+          inputSelector = 'input[name="URLz"]';
+          buttonSelector = 'button[type="submit"]';
+          resultSelector = '.results-download a';
+          evaluateFn = () => {
+            const link = document.querySelector('.results-download a');
+            return link ? link.href : null;
+          };
+        }
+
+        await page.goto(toolUrl, {
           waitUntil: 'networkidle2',
-          timeout: 30000 
+          timeout: 30000
         });
 
-        await page.type('#main_page_text', url);
-        await page.click('#submit');
-        await page.waitForSelector('.result_overlay', { 
-          timeout: 30000 
-        });
+        await page.type(inputSelector, url);
+        await page.click(buttonSelector);
+        await page.waitForSelector(resultSelector, { timeout: 30000 });
 
-        const downloadUrl = await page.evaluate(() => {
-          const link = document.querySelector('a.pure-button-primary');
-          return link ? link.href : null;
-        });
+        const downloadUrl = await page.evaluate(evaluateFn);
 
         if (!downloadUrl) {
           throw new Error('Could not extract download link');
         }
 
-        return res.json({ 
-          success: true, 
-          downloadUrl 
+        return res.json({
+          success: true,
+          downloadUrl
         });
+
       } finally {
         await browser.close();
       }
@@ -190,7 +221,7 @@ app.get('/downloads/:filename', (req, res) => {
         message: 'File download failed' 
       });
     }
-    
+
     // Clean up file after download completes
     try {
       fs.unlinkSync(filepath);
