@@ -1,11 +1,9 @@
-const express = require('express'); 
+const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { exec } = require('child_process');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const proxyChain = require('proxy-chain');
-const { HttpsProxyAgent } = require('https-proxy-agent');
 const fs = require('fs');
 const https = require('https');
 require('dotenv').config();
@@ -111,30 +109,30 @@ async function handleSocialDownload(url, platform, res) {
   const proxyUrl = getNextProxy();
 
   try {
-    const browserOptions = {
+    let browserOptions = {
       headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-      ]
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     };
 
     let proxyAuth = null;
 
     if (proxyUrl) {
-      const proxyMatch = proxyUrl.match(/^(?:http:\/\/)?(?:(.*?):(.*?)@)?(.*)$/);
-      if (proxyMatch) {
-        const [, username, password, hostPort] = proxyMatch;
-        browserOptions.args.push(`--proxy-server=${hostPort}`);
-        if (username && password) {
-          proxyAuth = { username, password };
+      try {
+        const parsed = new URL(proxyUrl);
+        browserOptions.args.push(`--proxy-server=${parsed.hostname}:${parsed.port}`);
+        if (parsed.username && parsed.password) {
+          proxyAuth = {
+            username: parsed.username,
+            password: parsed.password
+          };
         }
+      } catch (e) {
+        console.warn('Invalid proxy URL:', proxyUrl);
       }
     }
 
-    const browser = await puppeteer.launch(browserOptions);
-    const page = await browser.newPage();
+    let browser = await puppeteer.launch(browserOptions);
+    let page = await browser.newPage();
 
     if (proxyAuth) {
       await page.authenticate(proxyAuth);
@@ -143,9 +141,9 @@ async function handleSocialDownload(url, platform, res) {
     await page.setViewport({ width: 1280, height: 720 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
-    try {
-      let downloadUrl;
+    let downloadUrl;
 
+    try {
       if (platform === 'tiktok') {
         await page.goto('https://snaptik.app/en', { waitUntil: 'networkidle2', timeout: 30000 });
         await page.type('input[name="url"]', url);
@@ -187,9 +185,13 @@ async function handleSocialDownload(url, platform, res) {
         throw new Error('HTTPS download failed: ' + err.message);
       });
 
-    } finally {
+    } catch (scrapeError) {
       await browser.close();
+      throw scrapeError;
     }
+
+    await browser.close();
+
   } catch (error) {
     console.error(`${platform} Download Error:`, error);
     return res.status(500).json({
@@ -204,10 +206,7 @@ app.post('/download', async (req, res) => {
 
   try {
     if (!url) {
-      return res.status(400).json({
-        success: false,
-        message: 'URL is required'
-      });
+      return res.status(400).json({ success: false, message: 'URL is required' });
     }
 
     if (platformDetectors.youtube(url)) {
@@ -223,17 +222,11 @@ app.post('/download', async (req, res) => {
       return await handleSocialDownload(url, 'instagram', res);
     }
 
-    return res.status(400).json({
-      success: false,
-      message: 'Unsupported platform'
-    });
+    return res.status(400).json({ success: false, message: 'Unsupported platform' });
 
   } catch (error) {
     console.error('Server Error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error: ' + error.message
-    });
+    return res.status(500).json({ success: false, message: 'Server error: ' + error.message });
   }
 });
 
@@ -242,19 +235,13 @@ app.get('/downloads/:filename', (req, res) => {
   const filepath = path.join(DOWNLOAD_FOLDER, filename);
 
   if (!fs.existsSync(filepath)) {
-    return res.status(404).json({
-      success: false,
-      message: 'File not found'
-    });
+    return res.status(404).json({ success: false, message: 'File not found' });
   }
 
   res.download(filepath, filename, (err) => {
     if (err) {
       console.error('File Download Error:', err);
-      res.status(500).json({
-        success: false,
-        message: 'File download failed'
-      });
+      res.status(500).json({ success: false, message: 'File download failed' });
     }
 
     try {
