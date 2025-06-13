@@ -4,8 +4,11 @@ const path = require('path');
 const { exec } = require('child_process');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const proxyChain = require('proxy-chain');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const fs = require('fs');
 const https = require('https');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 puppeteer.use(StealthPlugin());
@@ -109,67 +112,38 @@ async function handleSocialDownload(url, platform, res) {
   const proxyUrl = getNextProxy();
 
   try {
-    let browserOptions = {
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    };
+    if (platform === 'facebook') {
+      const apifyUrl = `https://api.apify.com/v2/acts/epctex~facebook-downloader/runs?token=${process.env.APIFY_TOKEN}`;
 
-    let proxyAuth = null;
+      const runRes = await fetch(apifyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { videoUrl: url },
+        }),
+      });
 
-    if (proxyUrl) {
-      try {
-        const parsed = new URL(proxyUrl);
-        browserOptions.args.push(`--proxy-server=${parsed.hostname}:${parsed.port}`);
-        if (parsed.username && parsed.password) {
-          proxyAuth = {
-            username: parsed.username,
-            password: parsed.password
-          };
+      const runData = await runRes.json();
+      const runId = runData.data.id;
+
+      let videoInfo = null;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const resultRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${process.env.APIFY_TOKEN}`);
+        const resultData = await resultRes.json();
+
+        if (resultData.length > 0 && resultData[0].videoUrl) {
+          videoInfo = resultData[0];
+          break;
         }
-      } catch (e) {
-        console.warn('Invalid proxy URL:', proxyUrl);
-      }
-    }
-
-    let browser = await puppeteer.launch(browserOptions);
-    let page = await browser.newPage();
-
-    if (proxyAuth) {
-      await page.authenticate(proxyAuth);
-    }
-
-    await page.setViewport({ width: 1280, height: 720 });
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-    let downloadUrl;
-
-    try {
-      if (platform === 'tiktok') {
-        await page.goto('https://snaptik.app/en', { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.type('input[name="url"]', url);
-        await page.click('button[type="submit"]');
-        await page.waitForSelector('.download-link', { timeout: 30000 });
-        downloadUrl = await page.$eval('.download-link', el => el.href);
-      }
-      else if (platform === 'facebook') {
-        await page.goto('https://fdown.net', { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.type('input[name="URLz"]', url);
-        await page.click('button[type="submit"]');
-        await page.waitForSelector('.btns-download a', { timeout: 30000 });
-        downloadUrl = await page.$eval('.btns-download a', el => el.href);
-      }
-      else if (platform === 'instagram') {
-        await page.goto('https://snapinsta.app', { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.type('input[name="url"]', url);
-        await page.click('button[type="submit"]');
-        await page.waitForSelector('.download-result a[download]', { timeout: 30000 });
-        downloadUrl = await page.$eval('.download-result a[download]', el => el.href);
       }
 
-      if (!downloadUrl) throw new Error('Download link not found');
+      if (!videoInfo || !videoInfo.videoUrl) {
+        throw new Error('Failed to get video from Apify');
+      }
 
       const file = fs.createWriteStream(filepath);
-      https.get(downloadUrl, (response) => {
+      https.get(videoInfo.videoUrl, (response) => {
         response.pipe(file);
         file.on('finish', () => {
           file.close(() => {
@@ -185,13 +159,66 @@ async function handleSocialDownload(url, platform, res) {
         throw new Error('HTTPS download failed: ' + err.message);
       });
 
-    } catch (scrapeError) {
-      await browser.close();
-      throw scrapeError;
+    } else {
+      const browserOptions = {
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ]
+      };
+
+      if (proxyUrl) {
+        browserOptions.args.push(`--proxy-server=${proxyUrl}`);
+      }
+
+      const browser = await puppeteer.launch(browserOptions);
+      const page = await browser.newPage();
+
+      await page.setViewport({ width: 1280, height: 720 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+      try {
+        let downloadUrl;
+
+        if (platform === 'tiktok') {
+          await page.goto('https://snaptik.app/en', { waitUntil: 'networkidle2', timeout: 30000 });
+          await page.type('input[name="url"]', url);
+          await page.click('button[type="submit"]');
+          await page.waitForSelector('.download-link', { timeout: 30000 });
+          downloadUrl = await page.$eval('.download-link', el => el.href);
+        } else if (platform === 'instagram') {
+          await page.goto('https://snapinsta.app', { waitUntil: 'networkidle2', timeout: 30000 });
+          await page.type('input[name="url"]', url);
+          await page.click('button[type="submit"]');
+          await page.waitForSelector('.download-result a[download]', { timeout: 30000 });
+          downloadUrl = await page.$eval('.download-result a[download]', el => el.href);
+        }
+
+        if (!downloadUrl) throw new Error('Download link not found');
+
+        const file = fs.createWriteStream(filepath);
+        https.get(downloadUrl, (response) => {
+          response.pipe(file);
+          file.on('finish', () => {
+            file.close(() => {
+              return res.json({
+                success: true,
+                filename: filename,
+                message: 'Download completed successfully'
+              });
+            });
+          });
+        }).on('error', (err) => {
+          fs.unlinkSync(filepath);
+          throw new Error('HTTPS download failed: ' + err.message);
+        });
+
+      } finally {
+        await browser.close();
+      }
     }
-
-    await browser.close();
-
   } catch (error) {
     console.error(`${platform} Download Error:`, error);
     return res.status(500).json({
@@ -206,7 +233,10 @@ app.post('/download', async (req, res) => {
 
   try {
     if (!url) {
-      return res.status(400).json({ success: false, message: 'URL is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'URL is required'
+      });
     }
 
     if (platformDetectors.youtube(url)) {
@@ -222,11 +252,17 @@ app.post('/download', async (req, res) => {
       return await handleSocialDownload(url, 'instagram', res);
     }
 
-    return res.status(400).json({ success: false, message: 'Unsupported platform' });
+    return res.status(400).json({
+      success: false,
+      message: 'Unsupported platform'
+    });
 
   } catch (error) {
     console.error('Server Error:', error);
-    return res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
   }
 });
 
@@ -235,13 +271,19 @@ app.get('/downloads/:filename', (req, res) => {
   const filepath = path.join(DOWNLOAD_FOLDER, filename);
 
   if (!fs.existsSync(filepath)) {
-    return res.status(404).json({ success: false, message: 'File not found' });
+    return res.status(404).json({
+      success: false,
+      message: 'File not found'
+    });
   }
 
   res.download(filepath, filename, (err) => {
     if (err) {
       console.error('File Download Error:', err);
-      res.status(500).json({ success: false, message: 'File download failed' });
+      res.status(500).json({
+        success: false,
+        message: 'File download failed'
+      });
     }
 
     try {
