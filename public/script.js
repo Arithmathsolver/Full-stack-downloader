@@ -5,21 +5,20 @@ async function downloadVideo() {
 
     // Clear previous messages with animation
     statusDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Preparing download...</div>';
-    
+
     // Disable button during download
     const downloadBtn = document.querySelector('button');
     downloadBtn.disabled = true;
 
     try {
-        const payload = { 
+        const payload = {
             url: videoUrl,
-            // Add timestamp to help with proxy rotation
             requestId: Date.now().toString(36) + Math.random().toString(36).substring(2)
         };
 
         // Add quality only for YouTube
         if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-            payload.quality = quality || '720p'; // Default to 720p for better speed
+            payload.quality = quality || '720p';
         }
 
         const response = await fetch('/download', {
@@ -32,10 +31,8 @@ async function downloadVideo() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            
-            // Enhanced error handling
             let errorMessage = errorData.message || `Server error (status ${response.status})`;
-            
+
             if (response.status === 429) {
                 errorMessage = `
                     <strong>Too many requests!</strong><br><br>
@@ -60,9 +57,8 @@ async function downloadVideo() {
 
         const data = await response.json();
 
-        // Handle different response types
         if (data.downloadUrl) {
-            // For TikTok/Instagram/Facebook
+            // TikTok, Instagram, Facebook
             updateStatusWithDownloadLink(
                 statusDiv,
                 data.downloadUrl,
@@ -70,7 +66,7 @@ async function downloadVideo() {
                 'Download Now'
             );
         } else if (data.filename) {
-            // For YouTube
+            // YouTube
             updateStatusWithDownloadLink(
                 statusDiv,
                 `/downloads/${encodeURIComponent(data.filename)}`,
@@ -79,7 +75,7 @@ async function downloadVideo() {
                 true
             );
         } else {
-            throw new Error('Unexpected response format');
+            throw new Error('Unexpected server response format');
         }
 
     } catch (error) {
@@ -90,7 +86,6 @@ async function downloadVideo() {
     }
 }
 
-// Helper functions
 function updateStatusWithDownloadLink(container, url, message, linkText, isDownload = false) {
     container.innerHTML = `
         <div class="success">
@@ -101,18 +96,17 @@ function updateStatusWithDownloadLink(container, url, message, linkText, isDownl
             ${message}
         </div>
     `;
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.className = 'download-btn';
     link.textContent = linkText;
     link.target = '_blank';
     if (isDownload) link.download = true;
-    
+
     container.appendChild(document.createElement('br'));
     container.appendChild(link);
-    
-    // Add click tracking
+
     link.addEventListener('click', () => {
         console.log(`Download initiated for ${url}`);
     });
