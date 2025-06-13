@@ -21,7 +21,7 @@ ENV PYTHONIOENCODING=utf-8
 
 # Copy and install Node.js dependencies
 COPY package*.json ./
-RUN npm config set registry https://registry.npmmirror.com && npm install
+RUN npm install
 
 # Copy application source
 COPY . .
