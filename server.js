@@ -8,7 +8,7 @@ const proxyChain = require('proxy-chain');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const fs = require('fs');
 const https = require('https');
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
 
 puppeteer.use(StealthPlugin());
@@ -118,9 +118,7 @@ async function handleSocialDownload(url, platform, res) {
       const runRes = await fetch(apifyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: { videoUrl: url },
-        }),
+        body: JSON.stringify({ input: { videoUrl: url } })
       });
 
       const runData = await runRes.json();
@@ -162,11 +160,7 @@ async function handleSocialDownload(url, platform, res) {
     } else {
       const browserOptions = {
         headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       };
 
       if (proxyUrl) {
@@ -233,36 +227,24 @@ app.post('/download', async (req, res) => {
 
   try {
     if (!url) {
-      return res.status(400).json({
-        success: false,
-        message: 'URL is required'
-      });
+      return res.status(400).json({ success: false, message: 'URL is required' });
     }
 
     if (platformDetectors.youtube(url)) {
       return await handleYouTubeDownload(url, quality, res);
-    }
-    else if (platformDetectors.tiktok(url)) {
+    } else if (platformDetectors.tiktok(url)) {
       return await handleSocialDownload(url, 'tiktok', res);
-    }
-    else if (platformDetectors.facebook(url)) {
+    } else if (platformDetectors.facebook(url)) {
       return await handleSocialDownload(url, 'facebook', res);
-    }
-    else if (platformDetectors.instagram(url)) {
+    } else if (platformDetectors.instagram(url)) {
       return await handleSocialDownload(url, 'instagram', res);
     }
 
-    return res.status(400).json({
-      success: false,
-      message: 'Unsupported platform'
-    });
+    return res.status(400).json({ success: false, message: 'Unsupported platform' });
 
   } catch (error) {
     console.error('Server Error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error: ' + error.message
-    });
+    return res.status(500).json({ success: false, message: 'Server error: ' + error.message });
   }
 });
 
@@ -271,19 +253,13 @@ app.get('/downloads/:filename', (req, res) => {
   const filepath = path.join(DOWNLOAD_FOLDER, filename);
 
   if (!fs.existsSync(filepath)) {
-    return res.status(404).json({
-      success: false,
-      message: 'File not found'
-    });
+    return res.status(404).json({ success: false, message: 'File not found' });
   }
 
   res.download(filepath, filename, (err) => {
     if (err) {
       console.error('File Download Error:', err);
-      res.status(500).json({
-        success: false,
-        message: 'File download failed'
-      });
+      res.status(500).json({ success: false, message: 'File download failed' });
     }
 
     try {
