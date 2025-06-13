@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); 
 const cors = require('cors');
 const path = require('path');
 const { exec } = require('child_process');
@@ -120,12 +120,25 @@ async function handleSocialDownload(url, platform, res) {
       ]
     };
 
+    let proxyAuth = null;
+
     if (proxyUrl) {
-      browserOptions.args.push(`--proxy-server=${proxyUrl}`);
+      const proxyMatch = proxyUrl.match(/^(?:http:\/\/)?(?:(.*?):(.*?)@)?(.*)$/);
+      if (proxyMatch) {
+        const [, username, password, hostPort] = proxyMatch;
+        browserOptions.args.push(`--proxy-server=${hostPort}`);
+        if (username && password) {
+          proxyAuth = { username, password };
+        }
+      }
     }
 
     const browser = await puppeteer.launch(browserOptions);
     const page = await browser.newPage();
+
+    if (proxyAuth) {
+      await page.authenticate(proxyAuth);
+    }
 
     await page.setViewport({ width: 1280, height: 720 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
