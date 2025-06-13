@@ -27,13 +27,13 @@ const platformDetectors = {
   facebook: url => url.includes('facebook.com') || url.includes('fb.watch')
 };
 
-// YouTube download handler with bot avoidance
+// Updated YouTube download handler with improved error handling
 async function handleYouTubeDownload(url, quality, res) {
   const filename = `yt_${Date.now()}.mp4`;
   const filepath = path.join(DOWNLOAD_FOLDER, filename);
   const cookiesPath = path.join(__dirname, 'cookies.txt');
 
-  // Base command with bot avoidance measures
+  // Updated command with better format selection and bot avoidance
   let command = `yt-dlp \
     --no-playlist \
     --force-ipv4 \
@@ -45,28 +45,37 @@ async function handleYouTubeDownload(url, quality, res) {
     --max-sleep-interval 15 \
     --fragment-retries 10 \
     --buffer-size 32K \
-    -f "${quality || 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'}" \
-    -o "${filepath}"`;
+    --extractor-args "youtube:player_client=android" \
+    --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" \
+    -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"`;
 
-  // Add cookies if available
+  // Add cookies if available with improved error handling
   if (fs.existsSync(cookiesPath)) {
     command += ` --cookies ${cookiesPath}`;
   } else {
-    console.warn('No cookies.txt found - some videos may require authentication');
+    console.warn('No cookies.txt found - adding additional bot avoidance measures');
+    command += ` --extractor-args "youtube:skip=webpage"`;
   }
 
-  command += ` ${url}`;
+  command += ` -o "${filepath}" ${url}`;
 
   return new Promise((resolve) => {
     exec(command, (error, stdout, stderr) => {
       if (error) {
         console.error('YouTube Download Error:', stderr || error.message);
         
-        // Handle rate limiting specifically
+        // Enhanced error handling
         if (stderr.includes('429') || stderr.includes('Too Many Requests')) {
           return res.status(429).json({
             success: false,
-            message: 'YouTube rate limit exceeded. Please try again later or use cookies for authentication.'
+            message: 'YouTube rate limit exceeded. Please try again later or use updated cookies for authentication.'
+          });
+        }
+        
+        if (stderr.includes('Sign in to confirm you\'re not a bot')) {
+          return res.status(403).json({
+            success: false,
+            message: 'YouTube requires authentication. Please provide valid cookies in cookies.txt file.'
           });
         }
 
@@ -92,7 +101,7 @@ async function handleYouTubeDownload(url, quality, res) {
   });
 }
 
-// Download endpoint
+// Download endpoint (updated for TikTok and Facebook)
 app.post('/download', async (req, res) => {
   const { url, quality } = req.body;
 
@@ -109,11 +118,8 @@ app.post('/download', async (req, res) => {
       return await handleYouTubeDownload(url, quality, res);
     }
 
-    // TikTok/Instagram/Facebook handling
-    if (platformDetectors.tiktok(url) || 
-        platformDetectors.instagram(url) || 
-        platformDetectors.facebook(url)) {
-      
+    // TikTok handling
+    if (platformDetectors.tiktok(url)) {
       const browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -125,31 +131,75 @@ app.post('/download', async (req, res) => {
 
       const page = await browser.newPage();
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-      
+
       try {
-        await page.goto('https://ssstik.io/en', { 
+        await page.goto('https://ssstik.io/en', {
           waitUntil: 'domcontentloaded',
-          timeout: 20000 
+          timeout: 20000
         });
 
-        await page.type('#main_page_text', url);
-        await page.click('#submit');
-        await page.waitForSelector('.result_overlay, a.pure-button-primary', { 
-          timeout: 20000 
-        });
+        await page.waitForSelector('input[name="id"]', { timeout: 10000 });
+        await page.type('input[name="id"]', url);
+        await page.click('button[type="submit"]');
+
+        await page.waitForSelector('.result a.pure-button-primary', { timeout: 20000 });
 
         const downloadUrl = await page.evaluate(() => {
-          const link = document.querySelector('a.pure-button-primary');
+          const link = document.querySelector('.result a.pure-button-primary');
           return link ? link.href : null;
         });
 
         if (!downloadUrl) {
-          throw new Error('Could not extract download link');
+          throw new Error('Could not extract TikTok download link');
         }
 
-        return res.json({ 
-          success: true, 
-          downloadUrl 
+        return res.json({
+          success: true,
+          downloadUrl
+        });
+      } finally {
+        await browser.close();
+      }
+    }
+
+    // Facebook/Instagram handling
+    if (platformDetectors.facebook(url) || platformDetectors.instagram(url)) {
+      const browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ]
+      });
+
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+      try {
+        await page.goto('https://fdown.net', {
+          waitUntil: 'domcontentloaded',
+          timeout: 20000
+        });
+
+        await page.waitForSelector('input[name="URLz"]', { timeout: 10000 });
+        await page.type('input[name="URLz"]', url);
+        await page.click('button[type="submit"]');
+
+        await page.waitForSelector('.btns-download a', { timeout: 20000 });
+
+        const downloadUrl = await page.evaluate(() => {
+          const link = document.querySelector('.btns-download a');
+          return link ? link.href : null;
+        });
+
+        if (!downloadUrl) {
+          throw new Error('Could not extract Facebook download link');
+        }
+
+        return res.json({
+          success: true,
+          downloadUrl
         });
       } finally {
         await browser.close();
@@ -170,7 +220,7 @@ app.post('/download', async (req, res) => {
   }
 });
 
-// File download endpoint
+// File download endpoint (unchanged)
 app.get('/downloads/:filename', (req, res) => {
   const filename = req.params.filename;
   const filepath = path.join(DOWNLOAD_FOLDER, filename);
@@ -203,4 +253,13 @@ app.get('/downloads/:filename', (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`📁 Download folder: ${DOWNLOAD_FOLDER}`);
+  
+  // Auto-update yt-dlp on startup
+  exec('yt-dlp -U', (error, stdout, stderr) => {
+    if (error) {
+      console.error('Failed to update yt-dlp:', error);
+    } else {
+      console.log('yt-dlp update check:', stdout || stderr);
+    }
+  });
 });
