@@ -6,7 +6,6 @@ async function downloadVideo() {
     // Clear previous messages with animation
     statusDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Preparing download...</div>';
 
-    // Disable button during download
     const downloadBtn = document.querySelector('button');
     downloadBtn.disabled = true;
 
@@ -37,10 +36,10 @@ async function downloadVideo() {
                 errorMessage = `
                     <strong>Too many requests!</strong><br><br>
                     Try these solutions:<br>
-                    1. Wait 15-30 minutes<br>
+                    1. Wait 15–30 minutes<br>
                     2. Use a VPN<br>
                     3. Try again later<br>
-                    <small>${errorData.message || 'YouTube rate limit exceeded'}</small>
+                    <small>${errorData.message || 'Rate limit exceeded'}</small>
                 `;
             } else if (response.status === 403) {
                 errorMessage = `
@@ -57,25 +56,17 @@ async function downloadVideo() {
 
         const data = await response.json();
 
-        if (data.downloadUrl) {
-            // TikTok, Instagram, Facebook
+        if (data.filename) {
+            const downloadLink = `/downloads/${encodeURIComponent(data.filename)}`;
             updateStatusWithDownloadLink(
                 statusDiv,
-                data.downloadUrl,
-                'Direct download ready!',
-                'Download Now'
-            );
-        } else if (data.filename) {
-            // YouTube
-            updateStatusWithDownloadLink(
-                statusDiv,
-                `/downloads/${encodeURIComponent(data.filename)}`,
-                'HD download ready!',
+                downloadLink,
+                'Download is ready!',
                 'Save Video',
                 true
             );
         } else {
-            throw new Error('Unexpected server response format');
+            throw new Error('Unexpected server response: missing filename');
         }
 
     } catch (error) {
