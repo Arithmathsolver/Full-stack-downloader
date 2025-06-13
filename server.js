@@ -122,6 +122,12 @@ async function handleSocialDownload(url, platform, res) {
       });
 
       const runData = await runRes.json();
+
+      if (!runRes.ok || !runData?.data?.id) {
+        console.error('Apify Facebook API error:', runData);
+        throw new Error('Failed to start Apify Facebook actor. Check your APIFY_TOKEN or URL.');
+      }
+
       const runId = runData.data.id;
 
       let videoInfo = null;
