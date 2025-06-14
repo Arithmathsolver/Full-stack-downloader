@@ -50,7 +50,176 @@ button:hover {
   background: #0284c7;
 }
 
+button:disabled {
+  background: #64748b;
+  cursor: not-allowed;
+}
+
 #status {
   margin-top: 15px;
   font-size: 14px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Loading Styles */
+.loading {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.loading .spinner {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid #0ea5e9;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+.loading-text {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.loading-subtext {
+  font-size: 0.9em;
+  color: #94a3b8;
+}
+
+/* Error Styles */
+.error {
+  text-align: center;
+  padding: 15px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 10px;
+  color: #fca5a5;
+}
+
+.error-header {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 10px;
+  color: #fecaca;
+}
+
+.error-body {
+  text-align: left;
+  margin: 10px 0;
+  font-size: 0.95em;
+}
+
+.error-body p, .error-body ol, .error-body ul {
+  margin: 8px 0;
+}
+
+.error-footer {
+  font-size: 0.8em;
+  margin-top: 10px;
+  color: #fca5a5;
+}
+
+.retry-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 6px;
+  margin-top: 15px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.retry-btn:hover {
+  background: #dc2626;
+}
+
+/* Success Styles */
+.success {
+  text-align: center;
+  padding: 15px;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 10px;
+  color: #6ee7b7;
+}
+
+.checkmark {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 10px;
+}
+
+.checkmark__circle {
+  stroke: #10b981;
+  stroke-width: 2;
+}
+
+.checkmark__check {
+  stroke: #10b981;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.success-message {
+  font-weight: bold;
+  margin: 10px 0;
+  color: #a7f3d0;
+}
+
+.filesize-estimate {
+  font-size: 0.9em;
+  color: #94a3b8;
+  margin: 5px 0;
+}
+
+/* Download Button Styles */
+.download-btn {
+  display: inline-block;
+  background: #10b981;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  margin-top: 10px;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.download-btn:hover {
+  background: #059669;
+}
+
+.download-btn.direct-link {
+  background: #0ea5e9;
+}
+
+.download-btn.direct-link:hover {
+  background: #0284c7;
+}
+
+/* Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+  .container {
+    padding: 20px;
+    border-radius: 15px;
+  }
+  
+  h1 {
+    font-size: 20px;
+  }
+  
+  input, select, button {
+    padding: 10px;
+    font-size: 14px;
+  }
 }
