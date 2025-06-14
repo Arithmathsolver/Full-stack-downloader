@@ -11,9 +11,6 @@ const https = require('https');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-// Native fetch is automatically available in Node.js 18+
-// No need to import/require it
-
 // Enhanced stealth plugins
 puppeteer.use(StealthPlugin());
 puppeteer.use(require('puppeteer-extra-plugin-anonymize-ua')());
@@ -337,11 +334,30 @@ app.listen(PORT, () => {
     console.warn('⚠️ Some proxies were invalid and skipped');
   }
 
-  exec('yt-dlp -U', (error, stdout, stderr) => {
-    if (error) {
-      console.error('Failed to update yt-dlp:', error);
-    } else {
-      console.log('yt-dlp update check:', stdout || stderr);
-    }
-  });
+  // Modified yt-dlp update check with better error handling
+  if (!process.env.YT_DLP_SKIP_UPDATE_CHECK) {
+    exec('yt-dlp --version', (versionError, versionStdout) => {
+      if (versionError) {
+        console.warn('Could not check yt-dlp version:', versionError.message);
+        return;
+      }
+      
+      const currentVersion = versionStdout.trim();
+      console.log(`Using yt-dlp version: ${currentVersion}`);
+      
+      // Only attempt update if not in production or explicitly allowed
+      if (process.env.NODE_ENV !== 'production' || process.env.ALLOW_YT_DLP_UPDATES) {
+        exec('yt-dlp -U --no-warnings', (updateError, updateStdout, updateStderr) => {
+          if (updateError) {
+            console.log('Note: yt-dlp update check skipped (may be rate limited)');
+            console.log('Current version remains:', currentVersion);
+          } else {
+            console.log('yt-dlp update result:', updateStdout || updateStderr);
+          }
+        });
+      }
+    });
+  } else {
+    console.log('yt-dlp update checks disabled via YT_DLP_SKIP_UPDATE_CHECK');
+  }
 });
