@@ -8,9 +8,11 @@ const proxyChain = require('proxy-chain');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const fs = require('fs');
 const https = require('https');
-const fetch = require('node-fetch');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+
+// Native fetch is automatically available in Node.js 18+
+// No need to import/require it
 
 // Enhanced stealth plugins
 puppeteer.use(StealthPlugin());
