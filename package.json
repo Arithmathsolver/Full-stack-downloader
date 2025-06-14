@@ -21,6 +21,7 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-anonymize-ua": "^2.4.0",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-extra-plugin-block-resources": "^2.4.0",
     "proxy-chain": "^2.2.0"
   },
   "engines": {
