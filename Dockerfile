@@ -24,12 +24,11 @@ RUN set -eux; \
         break || sleep 30; \
     done
 
-# Install yt-dlp with retries
+# Install yt-dlp with retries (without immediate update check)
 RUN set -eux; \
     for i in 1 2 3 4 5; do \
         curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
         chmod a+rx /usr/local/bin/yt-dlp && \
-        yt-dlp -U && \
         break || sleep 30; \
     done
 
@@ -38,6 +37,7 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PYTHONIOENCODING=utf-8
 ENV NODE_ENV=production
+ENV YT_DLP_SKIP_UPDATE_CHECK=1
 
 # Install Node.js dependencies with cache optimization
 COPY package*.json ./
