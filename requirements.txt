@@ -1,3 +1,0 @@
-Flask==3.0.2
-yt-dlp==2024.6.9  # Updated to latest version
-flask-cors==4.0.0  # Added for CORS support
